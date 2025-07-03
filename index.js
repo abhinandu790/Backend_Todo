@@ -1,64 +1,80 @@
 const express = require("express");
-const app = express();
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const { text } = require("stream/consumers");
-const PORT = process.env.PORT||8080;
-const MONGOURL = process.env.MONGOURL;
-require('dotenv').config();
-console.log("MONGOURL from .env:", process.env.MONGOURL);
+const cors = require("cors");
+require("dotenv").config();
 
+const app = express();
+const PORT = process.env.PORT || 8080;
+const MONGOURL = process.env.MONGOURL;
+
+console.log("MONGOURL from .env:", MONGOURL);
+
+// Middleware
 app.use(express.json());
-mongoose.connect(MONGOURL, {
-    useNewUrlParser:true,
-    useUnifiedTopology:true,
-})
-.then(() => console.log("MongoDB Connected"))
-.catch((err) => console.error(" MongoDB Connection Error:", err));
-const userSchema=new mongoose.Schema({
-    username: String,
-    password: String,
+app.use(cors());
+
+
+mongoose.connect(MONGOURL)
+  .then(() => console.log("MongoDB Connected"))
+  .catch((err) => console.error("MongoDB Connection Error:", err));
+
+
+
+// Schemas
+const userSchema = new mongoose.Schema({
+  username: String,
+  password: String,
 });
-const User = mongoose.model("User" ,userSchema);
+const User = mongoose.model("User", userSchema);
+
 const taskSchema = new mongoose.Schema({
-    text: String,
-    status: String,
-    priority: String,
-    userId: mongoose.Schema.Types.ObjectId,
+  text: String,
+  status: String,
+  priority: String,
+  userId: mongoose.Schema.Types.ObjectId,
 });
 const Task = mongoose.model("Task", taskSchema);
 
-app.post("/register" ,async(req,res)=>{
-    const {username,password} =req.body;
-    const hashed=await bcrypt(password,10);
-    const user = new User({username, password: hashed});
-    await user.save();
-    res.json({message:"User has been registeres"});
+// Routes
+app.get("/", (req, res) => {
+  res.send("Backend is running");
 });
 
-app.post("/login", async(req,res)=>{
-    const {username,password}=req.body;
-    const user=await_findOne({username});
-    if(!user || !(await bcrypt.compare(password,user.pass))){
-        return res.status(401).json({message: "Invalid Credentials"})
-    }
-    const token=jwt.sign({userId:user_id}, "secret" ,{expiresIn:"1h"})
-    res.json({token});
+app.post("/register", async (req, res) => {
+  const { username, password } = req.body;
+  const hashed = await bcrypt.hash(password, 10);
+  const user = new User({ username, password: hashed });
+  await user.save();
+  res.json({ message: "User has been registered" });
 });
 
-const authMiddleware=(req,res,next)=>{
-    const token=req.header("Authorization")?.replace("Bearer","");
-    if(!token) return res.status(401).json({message:"No token"});
-    try{
-        const decode=jwt.verify(token,"secret");
-        req.userId=decode.userId;
-        next();
-    }catch(e){
-        res.status(401).json({message: "Invalid Token"});
-    }
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+  const user = await User.findOne({ username });
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    return res.status(401).json({ message: "Invalid Credentials" });
+  }
+  const token = jwt.sign({ userId: user._id }, "secret", { expiresIn: "1h" });
+  res.json({ token });
+});
+
+// Auth Middleware
+const authMiddleware = (req, res, next) => {
+  const token = req.header("Authorization")?.replace("Bearer ", "");
+  if (!token) return res.status(401).json({ message: "No token" });
+
+  try {
+    const decoded = jwt.verify(token, "secret");
+    req.userId = decoded.userId;
+    next();
+  } catch (e) {
+    res.status(401).json({ message: "Invalid Token" });
+  }
 };
 
+// Task routes
 app.get("/tasks", authMiddleware, async (req, res) => {
   const tasks = await Task.find({ userId: req.userId });
   res.json(tasks);
@@ -86,7 +102,6 @@ app.patch("/tasks/:id/status", authMiddleware, async (req, res) => {
   res.json(task);
 });
 
-
 app.patch("/tasks/:id/priority", authMiddleware, async (req, res) => {
   const { priority } = req.body;
   const task = await Task.findOneAndUpdate(
@@ -98,5 +113,7 @@ app.patch("/tasks/:id/priority", authMiddleware, async (req, res) => {
   res.json(task);
 });
 
+// Start server
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
 
-app.listen(PORT, () => console.log("Server is running"))
+

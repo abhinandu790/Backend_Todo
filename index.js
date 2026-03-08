@@ -13,7 +13,9 @@ console.log("MONGOURL from .env:", MONGOURL);
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+  origin: "*"   // allows all origins, simplest for Render+Vercel
+}));
 
 
 mongoose.connect(MONGOURL)

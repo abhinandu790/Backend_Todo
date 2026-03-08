@@ -14,9 +14,8 @@ console.log("MONGOURL from .env:", MONGOURL);
 // Middleware
 app.use(express.json());
 app.use(cors({
-  origin: "*"   // allows all origins, simplest for Render+Vercel
+  origin: "https://frontend-todo-ecru.vercel.app"
 }));
-
 
 mongoose.connect(MONGOURL)
   .then(() => console.log("MongoDB Connected"))
